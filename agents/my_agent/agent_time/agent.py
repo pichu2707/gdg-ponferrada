@@ -1,5 +1,6 @@
 from google.adk.agents.llm_agent import Agent
 
+# Activación de la herramienta de tiempo actual uv run adk run .\agent_time\
 
 # Mock tool implementation
 def get_current_time(city: str) -> dict:

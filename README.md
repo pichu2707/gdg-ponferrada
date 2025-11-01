@@ -23,4 +23,4 @@ ADK nos da diferentes categorías de los agentes para poder crear estas aplicaci
 2. **Agentes de flujo de trabajo (*SequentialAgent*, *ParalleAgent*, *LoopAgent*)**: Estos agentes estáan especializados en controlar el flujo de ejecución de otros agentes mediantes patrones predefinidos y determinista. Estos son ideales para procesos de estructurados que requiren una ejecución más predecible.
 3. **Agentes personalizados**: Si como lees podemos crear agentes mediante la extensión **BaseAgent** directam estos agentes permiten ingtegrar una lógica operativa única, flujos de control específicos o integraciones especializadas no contempladas por tipos estandarizando.
 
-✉️ Para cualquier consulta o mejora no dudes en escribirme a mi correo [hola@javilazaro.es](mailto:hola@javilazaro.es)
+✉️ Para cualquier consulta o mejora no dudes en escribirme a mi correo [hola@javilazaro.es](mailto:hola@javilazaro.es)ailto:hola@javilazaro.es)
