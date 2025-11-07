@@ -9,3 +9,10 @@ wheels/
 # Virtual environments
 .gdg
 .env
+
+# GCP service account key file
+*.json
+
+# Test files
+test_gcp_setup.py
+check_paths.py

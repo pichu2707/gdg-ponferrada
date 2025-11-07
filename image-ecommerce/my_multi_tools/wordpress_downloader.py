@@ -18,7 +18,7 @@ class WordPressMediaDownload:
             raise ValueError("La URL de WordPress debe comenzar con http:// o https://")
         self.base_url = wordpress_url.rstrip('/')
         self.api_endpoint = f"{self.base_url}/wp-json/wp/v2/media"
-        self.exclude_keywords = ['screenshot', 'elementor', 'logo', 'icon', 'banner', 'background']
+        self.exclude_keywords = ['screenshot', 'elementor', 'logo', 'icon', 'banner', 'filtros', 'background']
 
     def _is_potential_image(self, media_item: dict) -> bool:
         """Aplica heurísticas para determinar si una imagen es probablemente una foto de producto
@@ -137,7 +137,7 @@ class WordPressMediaDownload:
                     with open(filepath, 'wb') as f:
                         for chunk in r.iter_content(chunk_size=8192):
                             f.write(chunk)
-            except request.exceptions.RequestException as e:
+            except requests.exceptions.RequestException as e:
                 print(f"Error al descargar {url}: {e}")
             except Exception as e:
                 print(f"Error inesperado al descargar {url}: {e}")

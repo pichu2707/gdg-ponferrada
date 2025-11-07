@@ -1,4 +1,4 @@
-from my_multi_tools.wordpress_downloader import WordPressMediaDownload
+from wordpress_downloader import WordPressMediaDownload
 
 TARGET_URL = 'https://atelierdebodas.com/'  # Reemplaza con la URL de tu sitio WordPress
 IMAGES_TO_DOWNLOAD = 5  # Número de imágenes a descargar
