@@ -19,6 +19,9 @@ class WordPressMediaDownload:
         self.base_url = wordpress_url.rstrip('/')
         self.api_endpoint = f"{self.base_url}/wp-json/wp/v2/media"
         self.exclude_keywords = ['screenshot', 'elementor', 'logo', 'icon', 'banner', 'filtros', 'background']
+        self.downloaded_count = 0
+        self.skipped_count = 0
+        self.failed_count = 0
 
     def _is_potential_image(self, media_item: dict) -> bool:
         """Aplica heurísticas para determinar si una imagen es probablemente una foto de producto
@@ -53,7 +56,7 @@ class WordPressMediaDownload:
             return False
         return True
 
-    def fetch_media_urls(self) -> list[str]:
+    def fetch_media_urls(self, max_images: int = 0) -> list[str]:
         """
         Recupera todas las URLs de imágenes de la API de medios, manejando la paginación
 
@@ -67,6 +70,9 @@ class WordPressMediaDownload:
         print(f"Inicializando la obtención de URLs desde {self.api_endpoint}")
 
         while True:
+            if max_images > 0 and len(all_image_urls) >= max_images:
+                break
+
             params = {
                 'per_page': per_page,
                 'page': page
@@ -83,16 +89,19 @@ class WordPressMediaDownload:
                 if not media_items:
                     print("No se encontraron más elementos de medios.")
                     break
-
+                
+                valid_count_before = len(all_image_urls)
                 for item in media_items:
                     # Nos asguramos de que el item es una imagen y tiene la URL
                     if self._is_potential_image(item):
                         all_image_urls.append(item['source_url'])
+                        if max_images > 0 and len(all_image_urls) >= max_images:
+                            break
+                    
+                    added = len(all_image_urls) - valid_count_before
                     print(f"Página {page}: Obtenidas {len(media_items)} URLs de imágenes.")
                     page += 1
-
-                    print("Esperando 1 segundo para evitar sobrecargar el servidor...")
-                    time.sleep(1)  # Pausa para evitar sobrecargar el servidor
+                    time.sleep(1) # Pausa para evitar sobrecargar el servidor
 
             except requests.exceptions.Timeout as e:
                 print(f"Error: el servidor no respondió a tiempo en la página {page}. {e}")
@@ -104,11 +113,13 @@ class WordPressMediaDownload:
                 print(f"Error: la respuesta de la API en la página {page} no es JSON válido.")
                 break
 
-        print(f"Se encontraron un total de {len(all_image_urls)} URLs de imágenes.")
-        return all_image_urls
+        final_urls = all_image_urls[:max_images] if max_images > 0 else all_image_urls
+
+        print(f"Se encontraron un total de {len(final_urls)} URLs de imágenes válidas.")
+        return final_urls
 
     def download_images(self, urls: list[str], destination_folder: str = 'images'):
-        """DEscarga imágenes desde una lista de URLs a una carpeta de destino
+        """Descarga imágenes desde una lista de URLs a una carpeta de destino
 
         Args:
             urls (list[str]): Lista de URLs de imágenes a descargar
@@ -118,17 +129,25 @@ class WordPressMediaDownload:
             print("No hay URLs para descargar.")
             return
         
-        print(f"Creando directorio de destino: {destination_folder}")
-        os.makedirs(destination_folder, exist_ok=True)
+        # print(f"Creando directorio de destino: {destination_folder}")
+        # os.makedirs(destination_folder, exist_ok=True)
+        # Vamos crear el destino de manera realita a la carpeta de 'image-ecommerce'
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+        abs_destination_folder = os.path.join(project_root, destination_folder)
+
+        print(f'Creando directorio de destino: {abs_destination_folder}')
+        os.makedirs(abs_destination_folder, exist_ok=True)
 
         for url in urls:
             try:
                 # Estraer el nombre del fichero de la URL
-                filename = url.split('/')[-1]
-                filepath = os.path.join(destination_folder, filename)
+                # filename = url.split('/')[-1]
+                filename = url.split('/')[-1].split('?')[0]  # Eliminar parámetros de consulta si existen
+                filepath = os.path.join(abs_destination_folder, filename)
 
                 if os.path.exists(filepath):
                     print(f"El archivo {filename} ya existe. Saltando descarga.")
+                    self.skipped_count += 1
                     continue
 
                 print(f"Descargando {url} -> {filepath}")
@@ -137,21 +156,52 @@ class WordPressMediaDownload:
                     with open(filepath, 'wb') as f:
                         for chunk in r.iter_content(chunk_size=8192):
                             f.write(chunk)
+                self.downloaded_count += 1
             except requests.exceptions.RequestException as e:
                 print(f"Error al descargar {url}: {e}")
+                self.failed_count += 1
             except Exception as e:
                 print(f"Error inesperado al descargar {url}: {e}")
-
-    def run(self, destination_folder: str = 'images'):
+                self.failed_count += 1
+    def run(self, destination_folder: str, max_images: int = 0):
         """Método principal para obtener las URLs de imágenes y descargarlas
 
         Args:
-            destination_folder (str, optional): Carpeta de destino para las imágenes descargadas. Defaults to 'images'.
+            destination_folder (str, optional): Carpeta de destino para las imágenes descargadas.
+            max_images (int, optional): Número máximo de imágenes a descargar. 0 para ilimitado. Defaults to 0.
         """
-        print("Iniciando el proceso de descarga de imágenes desde WordPress...")
-        media_urls = self.fetch_media_urls()
+        print(f"Iniciando el proceso de descarga de imágenes desde WordPress... Límite de descarga de imágenes: {'Sin límite' if max_images == 0 else max_images}")
+        media_urls = self.fetch_media_urls(max_images=max_images)
         if media_urls:
             self.download_images(media_urls, destination_folder)
         print("Proceso de descarga completado.")
 
-            
+def download_imagenes_wordpress(
+    wordpress_url: str, 
+    destination_folder: str = "image-ecommerce/images/wordpress", 
+    max_images: int = 0
+    ) -> str:
+    """Descarga de imágenes de productos desde un sitio de WordPress a una carpeta local.
+
+    Args:
+        wordpress_url (str): La URL del sitio de WordPress desde donde descargar las imágenes.
+        destination_folder (str, optional): La carpeta local donde se guardarán las imágenes. Defaults to "image-ecommerce/images/wordpress".
+        max_images (int, optional): El número máximo de imágenes a descargar. Si es 0, se descargarán todas las imágenes.
+    Returns:
+        str: Un mensaje indicando el resultado de la operación.
+    """
+    try:
+        downloader = WordPressMediaDownload(wordpress_url=wordpress_url)
+        downloader.run(
+            destination_folder=destination_folder, 
+            max_images=max_images
+            )
+        summary = (
+            f"Descarga completada. "
+            f"Imágenes descargadas: {downloader.downloaded_count}, "
+            f"Saltadas: {downloader.skipped_count}, "
+            f"Fallidas: {downloader.failed_count}."
+        )
+        return summary
+    except Exception as e:
+        return f"Error durante la descarga de imágenes: {e}"
