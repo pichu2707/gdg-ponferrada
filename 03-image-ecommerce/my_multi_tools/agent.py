@@ -1,3 +1,14 @@
+"""
+Este módulo contiene herramientas para la extracción de imágenes desde CMS y la generación de videos promocionales utilizando el modelo Veo.
+
+Funciones:
+- extraer_imagenes_de_cms: Extrae imágenes de un CMS específico.
+- generar_video_veo: Genera un video a partir de una imagen y un prompt.
+- listar_imagenes_en_carpeta: Lista las imágenes en una carpeta específica.
+- generar_videos_desde_archivos: Genera videos a partir de una lista de archivos de imagen.
+- generar_videos_en_carpeta: Genera videos para todas las imágenes en una carpeta específica.
+"""
+
 import os
 from dotenv import load_dotenv
 load_dotenv(override=True)
@@ -71,22 +82,6 @@ os.environ["GOOGLE_CLOUD_LOCATION"] = loc
 # Algunas versiones del SDK también leen estas:
 os.environ["GOOGLE_GENAI_PROJECT"] = proj
 os.environ["GOOGLE_GENAI_LOCATION"] = loc
-
-# Resolver GOOGLE_APPLICATION_CREDENTIALS (fallback al JSON en image-ecommerce)
-CRED_ENV = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
-upper_path = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "gcp-credentials.json"
-)
-if not CRED_ENV or not os.path.isfile(CRED_ENV):
-    if os.path.isfile(upper_path):
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = upper_path
-        print(f"[FIX] GOOGLE_APPLICATION_CREDENTIALS -> {upper_path}")
-    else:
-        raise FileNotFoundError(f"Credenciales no encontradas: {CRED_ENV or '(vacío)'} ni {upper_path}")
-
-print(f"[DEBUG] GOOGLE_APPLICATION_CREDENTIALS={os.environ['GOOGLE_APPLICATION_CREDENTIALS']}")
-print(f"[DEBUG] GOOGLE_CLOUD_PROJECT={os.getenv('GOOGLE_CLOUD_PROJECT')}, GOOGLE_CLOUD_LOCATION={os.getenv('GOOGLE_CLOUD_LOCATION')}")
 
 # ----------------------------------------------------------------------
 # 1. HERRAMIENTA DE EXTRACCIÓN (Wrapper para la clase WordPress)

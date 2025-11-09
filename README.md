@@ -146,6 +146,7 @@ await call_agent_async(long_text)
 6. Luego puede `main_agent`tomar el resuemn y formular su respuesta final al usuario
 
 
-El colaboración con ![LIN3S](https://github.com/pichu2707/gdg-ponferrada/blob/master/images/logos/LIN3S-white.png)
+##El colaboración con:
+![LIN3S](https://github.com/pichu2707/gdg-ponferrada/blob/master/images/logos/LIN3S-white.png)
 
 ✉️ Para cualquier consulta o mejora no dudes en escribirme a mi correo [hola@javilazaro.es](mailto:hola@javilazaro.es)ailto:hola@javilazaro.es)
