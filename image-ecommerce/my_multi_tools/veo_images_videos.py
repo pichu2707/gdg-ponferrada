@@ -26,7 +26,7 @@ if not os.path.exists(credentials_path):
     print(f"[!] ERROR: Archivo de credenciales no encontrado en {credentials_path}")
     exit(1)
 
-# Cliente Vertex AI
+# Cliente Vertex AI (para Veo)
 try:
     client = genai.Client(
         vertexai=True,
@@ -233,7 +233,7 @@ def generate_video_from_image(
                 return None, f"Timeout tras {timeout_sec // 60} minutos"
             time.sleep(15)
             try:
-                # CORRECCIÓN: pasar el objeto operation
+                # refrescar con el objeto operación
                 operation = client.operations.get(operation)
             except Exception as refresh_err:
                 print(f"[!] Error refrescando operación: {refresh_err}")

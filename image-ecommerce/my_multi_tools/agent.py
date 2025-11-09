@@ -2,6 +2,25 @@ import os
 from dotenv import load_dotenv
 load_dotenv(override=True)
 
+def _project_root() -> str:
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+def _resolve_image_path(name_or_path: str, carpeta: str = "wordpress") -> str:
+    p = (name_or_path or "").strip().strip("'").strip('"')
+    if not p:
+        return p
+    if os.path.isabs(p):
+        return os.path.normpath(p)
+    p = p.replace("\\", "/")
+    root = _project_root()
+    if p.lower().startswith("image-ecommerce/images/"):
+        rel = p.split("image-ecommerce/", 1)[-1]
+        return os.path.normpath(os.path.join(root, rel))
+    if p.lower().startswith("images/"):
+        return os.path.normpath(os.path.join(root, p))
+    base = os.path.basename(p)
+    return os.path.normpath(os.path.join(root, "images", carpeta, base))
+
 # Forzar modo API (Gemini API, no Vertex AI para el agente)
 os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "FALSE"
 
@@ -69,40 +88,6 @@ if not CRED_ENV or not os.path.isfile(CRED_ENV):
 print(f"[DEBUG] GOOGLE_APPLICATION_CREDENTIALS={os.environ['GOOGLE_APPLICATION_CREDENTIALS']}")
 print(f"[DEBUG] GOOGLE_CLOUD_PROJECT={os.getenv('GOOGLE_CLOUD_PROJECT')}, GOOGLE_CLOUD_LOCATION={os.getenv('GOOGLE_CLOUD_LOCATION')}")
 
-
-# ----------------------------------------------------------------------
-# Funciones auxiliares para el cliente de Veo
-# ----------------------------------------------------------------------
-
-
-# def _get_veo_client():
-#     """Inicializa y devuelve el cliente de genai (Vertex AI) para Veo."""
-#     try:
-#         # Usando la nueva SDK de Google GenAI
-#         client = genai.Client(
-#             vertexai=True,
-#             project=os.getenv("GCP_PROJECT_ID", "gdg-ponferrada"),
-#             location=os.getenv("GCP_LOCATION", "us-central1"),
-#         )
-#         print(f"[X] Cliente GCP inicializado (GenAI SDK) para Veo.")
-#         return client
-#     except Exception as e:
-#         print(f"Error al inicializar el cliente de Vertex AI (GenAI): {e}")
-#         return None
-
-# def _guess_mime_type(path: str) -> str:
-#     """Obtiene un MIME type robusto basado en mimetypes/extensión."""
-#     mimetypes.add_type('image/webp', '.webp') 
-#     mime, _ = mimetypes.guess_type(path)
-#     if mime:
-#         return mime
-#     ext = os.path.splitext(path)[1].lower()
-#     return {
-#         '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
-#         '.gif': 'image/gif', '.webp': 'image/webp',
-#     }.get(ext, 'image/jpeg')
-
-
 # ----------------------------------------------------------------------
 # 1. HERRAMIENTA DE EXTRACCIÓN (Wrapper para la clase WordPress)
 # ----------------------------------------------------------------------
@@ -154,7 +139,14 @@ def extraer_imagenes_de_cms(cms_url: str, cms_platform: str) -> Dict[str, Union[
 # 2. HERRAMIENTA DE GENERACIÓN DE VIDEO (Veo) - LÓGICA INTEGRADA DEL SCRIPT
 # ----------------------------------------------------------------------
 
-def generar_video_veo(ruta_imagen_origen: str, prompt_video: str, duracion_segundos: int = 8) -> Dict[str, str]:
+def generar_video_veo(
+        nombre_archivo: str,
+        ruta_imagen_origen: str, 
+        prompt_video: str, 
+        carpeta: str = "wordpress",
+        duracion_segundos: int = 8,
+        overwrite: bool = False
+        ) -> Dict[str, str]:
     """
     Genera un video promocional usando el modelo Veo (veo-2.0-generate-001) 
     a partir de una imagen y un prompt detallado, integrando tu lógica de polling.
@@ -168,29 +160,23 @@ def generar_video_veo(ruta_imagen_origen: str, prompt_video: str, duracion_segun
         Un diccionario con 'status' y 'video_path' o un 'error_message'.
     """
     
-    if not os.path.exists(ruta_imagen_origen):
-        return {
-            "status": "error", 
-            "error_message": f"Error: La imagen de origen no existe en la ruta: {ruta_imagen_origen}"
-            }
-    
-    prompt = f"{prompt_video}. Short {duracion_segundos} seconds.  cinematic shot, smooth camera, natural motion."
-    res = generate_videos_for_list(
-        [ruta_imagen_origen],
+    from .veo_images_videos import generate_videos_for_list
+    image_path = _resolve_image_path(nombre_archivo, carpeta)
+    print(f"[PATH] {image_path} existe={os.path.isfile(image_path)}")
+    prompt = f"{prompt_video}. Short {duracion_segundos} seconds. cinematic shot, smooth camera, natural motion."
+    return generate_videos_for_list(
+        image_paths=[image_path],
         prompt=prompt,
+        overwrite=overwrite
     )
-    item = res.get("results", [{}])[0]
-    if item.get("video_path"):
-        return {
-            "status": "success",
-            "video_path": item["video_path"],
-            "message": f"Video de {duracion_segundos}s generado con éxito por Veo."
-        }
-    return {
-        "status": "error",
-        "error_message": item.get("error_message", "Fallo desconocido en la generación de video de Veo.")
-    }
 
+def listar_imagenes_en_carpeta(plataforma: str = "wordpress") -> Dict[str, object]:
+    images_dir = os.path.join(_project_root(), "images", plataforma)
+    if not os.path.isdir(images_dir):
+        return {"status": "error", "message": f"No existe: {images_dir}"}
+    soportadas = {".jpg",".jpeg",".png",".gif",".webp"}
+    files = [f for f in os.listdir(images_dir) if os.path.splitext(f)[1].lower() in soportadas]
+    return {"status": "success", "dir": images_dir, "count": len(files), "files": files[:500]}
 
 def generar_videos_desde_archivos(
         nombre_archivo: List[str],
@@ -211,10 +197,11 @@ def generar_videos_desde_archivos(
     Returns:
         Dict[str, object]: Un diccionario con el estado y la ruta del video generado o un mensaje de error.
     """
-    base_dir=os.path.dirname(os.path.abspath(__file__))
-    images_dir=os.path.join(os.path.dirname(base_dir), "images", carpeta)
-    image_paths = [os.path.join(images_dir, n) for n in nombre_archivo]
-    prompt = f"{prompt_video}. Short {duracion_segundos} seconds.  cinematic shot, smooth camera, natural motion."
+    from .veo_images_videos import generate_videos_for_list
+    image_paths = [_resolve_image_path(n, carpeta) for n in nombre_archivo]
+    for p in image_paths:
+        print(f"[PATH] {p} existe={os.path.isfile(p)}")
+    prompt = f"{prompt_video}. Short {duracion_segundos} seconds. cinematic shot, smooth camera, natural motion."
     return generate_videos_for_list(
         image_paths=image_paths,
         prompt=prompt,
@@ -260,7 +247,8 @@ e_commerce_agent = Agent(
         extraer_imagenes_de_cms, 
         generar_video_veo,
         generar_videos_desde_archivos,
-        generar_videos_en_carpeta,], 
+        generar_videos_en_carpeta,
+        listar_imagenes_en_carpeta], 
 )
 
 # ADK busca una variable llamada 'root_agent'
