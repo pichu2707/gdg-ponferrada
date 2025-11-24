@@ -191,108 +191,139 @@ def generate_video_from_image(
     prompt: str, 
     timeout_sec: int = 1200,
     model: str = 'veo-2.0-generate-001',
+    max_retries: int = 3,
 ) -> Tuple[Optional[bytes], Optional[str]]:
-    """Genera un video desde una imagen usando Veo 2."""
+    """Genera un video desde una imagen usando Veo 2.
+    
+    Args:
+        image_path: Ruta a la imagen fuente
+        prompt: Descripción del video a generar
+        timeout_sec: Tiempo máximo de espera en segundos
+        model: Modelo de Veo a usar
+        max_retries: Número máximo de reintentos en caso de error 503
+    """
     print(f"[VEO] Generando video desde: {image_path}")
     print(f"[VEO] Prompt: {prompt[:100]}...")
     
-    try:
-        ensure_webp_mimetype()
-        mime_type = guess_mime_type(image_path)
-        print(f"[VEO] MIME type: {mime_type}")
-
-        with open(image_path, "rb") as f:
-            image_bytes_data = f.read()
-        image = types.Image(image_bytes=image_bytes_data, mime_type=mime_type)
-
-        print(f"[VEO] Iniciando generación de video para '{os.path.basename(image_path)}'…")
-
-        operation = client.models.generate_videos(
-            model=model,
-            prompt=prompt,
-            image=image,
-            config=types.GenerateVideosConfig(
-                enhance_prompt=True,
-            ),
-        )
-
-        op_name = operation.name if hasattr(operation, 'name') else str(operation)
-        print(f"[VEO] Operación lanzada: {op_name}")
-
-        # Sondeo hasta completar
-        start_time = time.time()
-        last_min_logged = -1
-        
-        while not getattr(operation, "done", False):
-            elapsed = time.time() - start_time
-            elapsed_min = int(elapsed // 60)
-            if elapsed_min != last_min_logged:
-                print(f"[!] Esperando… {elapsed_min}m")
-                last_min_logged = elapsed_min
-            if elapsed >= timeout_sec:
-                return None, f"Timeout tras {timeout_sec // 60} minutos"
-            time.sleep(15)
-            try:
-                # refrescar con el objeto operación
-                operation = client.operations.get(operation)
-            except Exception as refresh_err:
-                print(f"[!] Error refrescando operación: {refresh_err}")
+    # Intentos con backoff exponencial para errores 503
+    for attempt in range(max_retries):
+        try:
+            if attempt > 0:
+                wait_time = 2 ** attempt  # Backoff exponencial: 2, 4, 8 segundos
+                print(f"[VEO] Reintento {attempt + 1}/{max_retries} después de {wait_time}s...")
+                time.sleep(wait_time)
             
-        print(f"[VEO] Operación completada")
+            ensure_webp_mimetype()
+            mime_type = guess_mime_type(image_path)
+            print(f"[VEO] MIME type: {mime_type}")
 
-        response = getattr(operation, "response", None)
-        if not response:
-            return None, "Operación sin respuesta"
+            with open(image_path, "rb") as f:
+                image_bytes_data = f.read()
+            image = types.Image(image_bytes=image_bytes_data, mime_type=mime_type)
+
+            print(f"[VEO] Iniciando generación de video para '{os.path.basename(image_path)}'…")
+
+            operation = client.models.generate_videos(
+                model=model,
+                prompt=prompt,
+                image=image,
+                config=types.GenerateVideosConfig(
+                    enhance_prompt=True,
+                ),
+            )
+
+            op_name = operation.name if hasattr(operation, 'name') else str(operation)
+            print(f"[VEO] Operación lanzada: {op_name}")
+
+            # Sondeo hasta completar
+            start_time = time.time()
+            last_min_logged = -1
+            
+            while not getattr(operation, "done", False):
+                elapsed = time.time() - start_time
+                elapsed_min = int(elapsed // 60)
+                if elapsed_min != last_min_logged:
+                    print(f"[!] Esperando… {elapsed_min}m")
+                    last_min_logged = elapsed_min
+                if elapsed >= timeout_sec:
+                    return None, f"Timeout tras {timeout_sec // 60} minutos"
+                time.sleep(15)
+                try:
+                    # refrescar con el objeto operación
+                    operation = client.operations.get(operation)
+                except Exception as refresh_err:
+                    print(f"[!] Error refrescando operación: {refresh_err}")
+                
+            print(f"[VEO] Operación completada")
+
+            response = getattr(operation, "response", None)
+            if not response:
+                return None, "Operación sin respuesta"
+            
+            generated = getattr(response, "generated_videos", None)
+            if not generated:
+                return None, "Operación sin videos generados"
+
+            first = generated[0]
+            video = getattr(first, "video", None)
+            if not video:
+                return None, "Respuesta sin objeto video"
+
+            video_bytes = (
+                getattr(video, "video_bytes", None) or
+                getattr(video, "bytes", None) or
+                getattr(video, "data", None)
+            )
+            
+            if not video_bytes and getattr(video, "uri", None):
+                uri = video.uri
+                print(f"[VEO] Descargando video desde URI: {uri}")
+                try:
+                    downloaded = client.files.download(name=uri)
+                    video_bytes = (
+                        getattr(downloaded, "video_bytes", None) or
+                        getattr(downloaded, "bytes", None) or
+                        getattr(downloaded, "data", None)
+                    )
+                except Exception as download_err:
+                    print(f"[!] Error descargando video desde URI: {download_err}")
+
+            if not video_bytes:
+                return None, "Video sin bytes/uri"
+
+            size_mb = len(video_bytes) / (1024 * 1024)
+            print(f"[VEO] Video generado exitosamente ({size_mb:.2f} MB)")
+            return video_bytes, None
         
-        generated = getattr(response, "generated_videos", None)
-        if not generated:
-            return None, "Operación sin videos generados"
-
-        first = generated[0]
-        video = getattr(first, "video", None)
-        if not video:
-            return None, "Respuesta sin objeto video"
-
-        video_bytes = (
-            getattr(video, "video_bytes", None) or
-            getattr(video, "bytes", None) or
-            getattr(video, "data", None)
-        )
-        
-        if not video_bytes and getattr(video, "uri", None):
-            uri = video.uri
-            print(f"[VEO] Descargando video desde URI: {uri}")
-            try:
-                downloaded = client.files.download(name=uri)
-                video_bytes = (
-                    getattr(downloaded, "video_bytes", None) or
-                    getattr(downloaded, "bytes", None) or
-                    getattr(downloaded, "data", None)
-                )
-            except Exception as download_err:
-                print(f"[!] Error descargando video desde URI: {download_err}")
-
-        if not video_bytes:
-            return None, "Video sin bytes/uri"
-
-        size_mb = len(video_bytes) / (1024 * 1024)
-        print(f"[VEO] Video generado exitosamente ({size_mb:.2f} MB)")
-        return video_bytes, None
+        except Exception as e:
+            error_str = str(e)
+            print(f"[VEO ERROR] Intento {attempt + 1}/{max_retries}: {type(e).__name__}: {e}")
+            
+            # Verificar si es un error 503 (UNAVAILABLE)
+            if "503" in error_str or "UNAVAILABLE" in error_str or "overloaded" in error_str.lower():
+                if attempt < max_retries - 1:
+                    print(f"[VEO] Modelo sobrecargado, reintentando...")
+                    continue
+                else:
+                    msg = "El modelo está sobrecargado. Por favor, intenta de nuevo en unos minutos."
+                    return None, msg
+            
+            # Para otros errores, fallar inmediatamente
+            import traceback
+            traceback.print_exc()
+            msg = error_str
+            if "PERMISSION_DENIED" in msg or "403" in msg:
+                msg += " | Tip: rol Vertex AI User"
+            elif "FAILED_PRECONDITION" in msg or "billing" in msg.lower():
+                msg += " | Tip: activar facturación"
+            elif "RESOURCE_EXHAUSTED" in msg or "quota" in msg.lower():
+                msg += " | Tip: revisar cuotas"
+            elif "NOT_FOUND" in msg or "404" in msg:
+                msg += " | Tip: región us-central1 y modelo correcto"
+            return None, msg
     
-    except Exception as e:
-        print(f"[VEO ERROR] {type(e).__name__}: {e}")
-        import traceback
-        traceback.print_exc()
-        msg = str(e)
-        if "PERMISSION_DENIED" in msg or "403" in msg:
-            msg += " | Tip: rol Vertex AI User"
-        elif "FAILED_PRECONDITION" in msg or "billing" in msg.lower():
-            msg += " | Tip: activar facturación"
-        elif "RESOURCE_EXHAUSTED" in msg or "quota" in msg.lower():
-            msg += " | Tip: revisar cuotas"
-        elif "NOT_FOUND" in msg or "404" in msg:
-            msg += " | Tip: región us-central1 y modelo correcto"
-        return None, msg
+    # Si llegamos aquí, todos los intentos fallaron
+    return None, "Todos los intentos fallaron debido a sobrecarga del modelo"
 
 def main() -> None:
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

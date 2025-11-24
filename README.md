@@ -1,4 +1,4 @@
-![Logo Javi Lazaro](https://github.com/pichu2707/gdg-ponferrada/blob/master/images/logos/V1__logo.png)
+![Logo Javi Lazaro](https://github.com/pichu2707/gdg-ponferrada/blob/master/images/logos/V1__logo.png) ![Logo Analaizer.digital](https://github.com/pichu2707/gdg-ponferrada/blob/master/images/logos/logo-analaizer.png)
 # Creación de Agentes IA con ADK y Gemini
 Vamos a explicar como utilizar [ADK](https://google.github.io/adk-docs/) (Agent Developmen Kit) el **Framework de Google** para desarrolla y gestionar agentes IA.
 ADK según nos dice Google **está optimizada para Gemini** pero esto no significa que no podamos utilizar otros Agentes IA como OpenAI, Anthropic o Ollama.
@@ -146,7 +146,7 @@ await call_agent_async(long_text)
 6. Luego puede `main_agent`tomar el resuemn y formular su respuesta final al usuario
 
 
-##El colaboración con:
+## El colaboración con:
 ![LIN3S](https://github.com/pichu2707/gdg-ponferrada/blob/master/images/logos/LIN3S-white.png)
 
 ✉️ Para cualquier consulta o mejora no dudes en escribirme a mi correo [hola@javilazaro.es](mailto:hola@javilazaro.es)ailto:hola@javilazaro.es)
