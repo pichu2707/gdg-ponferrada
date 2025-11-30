@@ -9,4 +9,5 @@ dependencies = [
     "google-generativeai>=0.8.5",
     "litellm>=1.78.7",
     "python-dotenv>=1.1.1",
+    "sphinx>=9.0.0",
 ]

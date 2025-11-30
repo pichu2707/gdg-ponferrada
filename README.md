@@ -149,4 +149,4 @@ await call_agent_async(long_text)
 ## El colaboración con:
 ![LIN3S](https://github.com/pichu2707/gdg-ponferrada/blob/master/images/logos/LIN3S-white.png)
 
-✉️ Para cualquier consulta o mejora no dudes en escribirme a mi correo [hola@javilazaro.es](mailto:hola@javilazaro.es)ailto:hola@javilazaro.es)
+✉️ Para cualquier consulta o mejora no dudes en escribirme a mi correo [hola@javilazaro.es](mailto:hola@javilazaro.es)
