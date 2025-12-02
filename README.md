@@ -1,4 +1,5 @@
 ![Logo Javi Lazaro](https://github.com/pichu2707/gdg-ponferrada/blob/master/images/logos/V1__logo.png) ![Logo Analaizer.digital](https://github.com/pichu2707/gdg-ponferrada/blob/master/images/logos/logo-analaizer.png)
+
 # Creación de Agentes IA con ADK y Gemini
 Vamos a explicar como utilizar [ADK](https://google.github.io/adk-docs/) (Agent Developmen Kit) el **Framework de Google** para desarrolla y gestionar agentes IA.
 ADK según nos dice Google **está optimizada para Gemini** pero esto no significa que no podamos utilizar otros Agentes IA como OpenAI, Anthropic o Ollama.
